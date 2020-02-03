@@ -117,7 +117,7 @@ exclude_patterns = ['_build', '_templates']
 #show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'default'
+pygments_style = 'sphinx'
 
 # Custom style
 html_style = 'css/project-template.css'
