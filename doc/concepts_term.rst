@@ -45,3 +45,14 @@ dabl segregates columns into ‘continuous’, ‘categorical’,
 
     * Treatment: all 'low_card_int' columns are treated as 'categorical' and
       'continuous' in preprocessing and model building.
+
+-   **dirty_float**: a column with float values containing a high fraction of strings
+                     which cannot be straightforward cast to float
+
+    * Detection: a column with float values is considered a dirty float column if:
+
+      * A fraction of values higher than ``dirty_float_threshold`` in the column
+        are strings. A heuristic is used to determine whether those strings should be
+        floats using a set of pre-defined regular expressions to match. If the fraction
+        of non-floats, excluding the 5 most common and missing values, is higher than
+        the threshold, the column is marked as ``dirty_float``.
