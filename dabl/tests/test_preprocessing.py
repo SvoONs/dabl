@@ -71,8 +71,7 @@ def test_detect_constant():
                       'second': ['no', 'no', 'no', 'no'],
                       'b': [0.0, 0.0, 0.0, 0],
                       'weird': ['0', '0', '0', '0']})
-    with pytest.warns(UserWarning, match="Discarding near-constant"):
-        res = detect_types(X)
+    res = detect_types(X)
     assert res.useless.sum() == 4
 
 
@@ -87,15 +86,27 @@ def test_target_col_not_dropped():
 
 
 def test_convert_cat_to_string():
-    X = pd.DataFrame({'a': [1, 2, 3, '1', 2, 3, 'a']})
+    X = pd.DataFrame({'a': [1, 2, 3, '1', 2, 3, 'a', 1, 2, 2, 3]})
     X_clean = clean(X)
     assert len(X_clean.a.cat.categories) == 4
 
 
 def test_continuous_castable():
-    X = pd.DataFrame({'a': [1, 2, 3, '1', 2, 3]})
+    X = pd.DataFrame({'a': [1, 2, 3, '1', 2, 3,  '1.1']})
     types = detect_types(X)
     assert types.continuous['a']
+
+
+# @pytest.mark.parametrize("null_object", [np.nan, None]) FIXME in sklearn
+@pytest.mark.parametrize("null_object", [np.nan])
+def test_boolean_and_nan(null_object):
+    X = pd.DataFrame({'a': [True, False, True, False, null_object]})
+    types = detect_types(X)
+    assert types.categorical.a
+
+    X_preprocessed = EasyPreprocessor().fit_transform(X)
+    assert X_preprocessed.shape[1] == 4
+    assert all(np.unique(X_preprocessed) == [0, 1])
 
 
 def test_dirty_float_single_warning():
@@ -142,8 +153,7 @@ def test_detect_types():
          'index_1_based': np.arange(1, 101),
          'index_shuffled': np.random.permutation(100)
          })
-    with pytest.warns(UserWarning, match="Discarding near-constant"):
-        res = detect_types(df_all)
+    res = detect_types(df_all)
     types = res.T.idxmax()
     assert types['categorical_string'] == 'categorical'
     assert types['binary_int'] == 'categorical'
@@ -167,7 +177,9 @@ def test_detect_types():
 
     res = detect_types(X_cat)
     assert len(res) == 3
-    assert res.categorical.all()
+    assert res.categorical.a
+    assert res.categorical.binary
+    assert res.free_string.second
     assert ~res.continuous.any()
 
     iris = load_iris()
@@ -245,6 +257,15 @@ def test_detect_string_floats():
     res = clean(X)
 
 
+def test_detect_types_empty():
+    X = pd.DataFrame(index=range(100))
+    types = detect_types(X)
+    assert (types == bool).all(axis=None)
+    known_types = ['continuous', 'dirty_float', 'low_card_int', 'categorical',
+                   'date', 'free_string', 'useless']
+    assert (types.columns == known_types).all()
+
+
 def test_transform_dirty_float():
     dirty = make_dirty_float()
     dfc = DirtyFloatCleaner()
@@ -287,7 +308,7 @@ def test_simple_preprocessor():
     sp = EasyPreprocessor()
     sp.fit(X_cat)
     trans = sp.transform(X_cat)
-    assert trans.shape == (3, 7)  # FIXME should be 6?
+    assert trans.shape == (3, 4)
 
     iris = load_iris()
     sp = EasyPreprocessor()
@@ -413,3 +434,41 @@ def test_dirty_float_target_regression():
 
     # check if works for non dirty_float targets
     plot(titanic_data, 'survived')
+
+
+def test_string_types_detection():
+    df = pd.DataFrame({'strings': ['uid123', 'mqqwen.m,',
+                                   '2cm', 'iddqd'],
+                       'text': ["There once was", "a data scientist",
+                                "that didn't know",
+                                "what type their data was."]})
+    types = detect_types(df)
+    assert types.free_string['strings']
+    assert types.free_string['text']
+
+
+def test_detect_date_types():
+    df = pd.DataFrame({'dates': ["10/3/2010", "1/2/1975", "12/12/1812"],
+                       'more dates': ["1985-7-3", "1985-7-4", "1985-7-5"],
+                       'also times': ['2014-01-01 06:12:39+00:00',
+                                      '2014-01-01 06:51:08+00:00',
+                                      '2014-01-01 09:58:07+00:00']})
+
+    types = detect_types(df)
+    assert types.date.all()
+
+
+def test_strings_not_binary():
+    df = pd.DataFrame({'binary_lol': ['in soviet russia', 'in soviet russia',
+                                      'the binary is you']})
+    types = detect_types(df)
+    assert types.categorical.binary_lol
+
+
+def test_mostly_nan_values():
+    x = np.empty(shape=1000)
+    x[:] = np.NaN
+    x[:3] = 1
+    df = pd.DataFrame({'mostly_empty': x})
+    types = detect_types(df)
+    assert types.useless.mostly_empty

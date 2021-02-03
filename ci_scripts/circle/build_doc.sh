@@ -117,8 +117,8 @@ conda create -n $CONDA_ENV_NAME --yes --quiet python="${PYTHON_VERSION:-*}" \
   joblib sphinx_rtd_theme seaborn numpydoc
 
 source activate testenv
-pip install sphinx-gallery
-pip install scikit-learn
+pip install sphinx-gallery sphinx_issues
+pip install scikit-learn --pre
 
 # Build and install in dev mode
 python setup.py develop
